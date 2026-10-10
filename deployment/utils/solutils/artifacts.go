@@ -172,8 +172,12 @@ func downloadProgramArtifacts(ctx context.Context, url string, targetDir string,
 			return fmt.Errorf("archive total size exceeds limit (limit: %d bytes)", maxTotalSize)
 		}
 
+		outPath, err := safeArchiveExtractPath(targetDir, header.Name)
+		if err != nil {
+			return err
+		}
+
 		// Copy the file to the target directory
-		outPath := filepath.Join(targetDir, filepath.Base(header.Name))
 		if err := os.MkdirAll(filepath.Dir(outPath), os.ModePerm); err != nil {
 			return err
 		}
@@ -203,6 +207,27 @@ func downloadProgramArtifacts(ctx context.Context, url string, targetDir string,
 	}
 
 	return nil
+}
+
+func safeArchiveExtractPath(targetDir, archivePath string) (string, error) {
+	if archivePath == "" || archivePath == "." || archivePath == string(filepath.Separator) {
+		return "", fmt.Errorf("invalid archive entry path: %q", archivePath)
+	}
+	if filepath.IsAbs(archivePath) {
+		return "", fmt.Errorf("invalid archive entry path: %q", archivePath)
+	}
+	clean := filepath.Clean(archivePath)
+	if clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("archive entry escapes target directory: %q", archivePath)
+	}
+
+	outPath := filepath.Join(targetDir, filepath.Base(clean))
+	outPath = filepath.Clean(outPath)
+	targetClean := filepath.Clean(targetDir)
+	if outPath != targetClean && !strings.HasPrefix(outPath+string(filepath.Separator), targetClean+string(filepath.Separator)) {
+		return "", fmt.Errorf("archive entry escapes target directory: %q", archivePath)
+	}
+	return outPath, nil
 }
 
 // githubReleaseURL constructs a GitHub release asset download URL.

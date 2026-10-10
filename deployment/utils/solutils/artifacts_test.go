@@ -99,6 +99,31 @@ func TestDownloadProgramArtifacts(t *testing.T) {
 			wantErr: "gzip",
 		},
 		{
+			name: "rejects path traversal archive entry",
+			setupServer: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("Content-Type", "application/gzip")
+
+					gzWriter := gzip.NewWriter(w)
+					defer gzWriter.Close()
+
+					tarWriter := tar.NewWriter(gzWriter)
+					defer tarWriter.Close()
+
+					content := "malicious payload"
+					header := &tar.Header{
+						Name:     "../../outside.txt",
+						Size:     int64(len(content)),
+						Typeflag: tar.TypeReg,
+					}
+					require.NoError(t, tarWriter.WriteHeader(header))
+					_, err := tarWriter.Write([]byte(content))
+					require.NoError(t, err)
+				}))
+			},
+			wantErr: "escapes target directory",
+		},
+		{
 			name: "empty tar archive",
 			setupServer: func() *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
