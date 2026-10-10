@@ -744,7 +744,7 @@ WHERE job_proposal_id = ANY($1)
 `
 	var specs []JobProposalSpec
 	err := o.ds.SelectContext(ctx, &specs, stmt, ids)
-	return specs, errors.Wrap(err, "GetJobProposalsByManagersIDs failed")
+	return specs, errors.Wrap(err, "ListSpecsByJobProposalIDs failed")
 }
 
 // RejectSpec rejects the spec and updates the job proposal
